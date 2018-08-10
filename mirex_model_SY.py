@@ -81,22 +81,23 @@ Models candidates:
 '''
 
 # DAC-like model(1)
-def mono_1(inp, inp_dim, num_unit, emb_dim, phase, scope):
-		# for duration
-		def dur_model():
-			with tf.variable_scope("dur_model", reuse=tf.AUTO_REUSE):
-				gru_out0 = GRU(inp, num_unit, scope="gru_0")
-				gru_out1 = GRU(gru_out0, num_unit, scope="gru_1")
-				final_out = tf.nn.softmax(gru_out1, name='softmax')
-			return final_out
-		# for pitch
-		def mnn_model():
-			with tf.variable_scope("mnn_model", reuse=tf.AUTO_REUSE):
-				gru_out2 = GRU(inp, num_unit, scope="gru_2")
-				gru_out3 = GRU(gru_out2, num_unit, scope="gru_3")
-				final_out = tf.nn.softmax(gru_out3, name='softmax')
-			return final_out
+# for duration
+def dur_model(dur, inp_dim, num_unit, phase, scope):
+	with tf.variable_scope("dur_model", reuse=tf.AUTO_REUSE):
+		gru_out0 = GRU(dur, num_unit, scope="gru_0")
+		gru_out1 = GRU(gru_out0, dur_dim, scope="gru_1")
+		final_out = tf.nn.softmax(gru_out1, name='softmax')
+	return final_out
 
+# for pitch
+def mnn_model(mnn, inp_dim, num_unit, phase, scope):
+	with tf.variable_scope("mnn_model", reuse=tf.AUTO_REUSE):
+		gru_out0 = GRU(mnn, num_unit, scope="gru_0")
+		gru_out1 = GRU(gru_out2, mnn_dim, scope="gru_1")
+		final_out = tf.nn.softmax(gru_out1, name='softmax')
+	return final_out
+
+# DAC-like model(2)
 
 
 
