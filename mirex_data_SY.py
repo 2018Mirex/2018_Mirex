@@ -9,7 +9,7 @@ import tensorflow as tf
 
 '''
 - This is a code for parsing symbolic data for "MIREX2018: Patterns of Prediction".
-- Both 'monophonic' and 'polyphonic' versions work.
+- Only 'monophonic' version works.
 '''
 
 
