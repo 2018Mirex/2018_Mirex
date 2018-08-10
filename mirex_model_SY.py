@@ -8,9 +8,9 @@ import numpy as np
 def look_up(input_dim, emb_dim, scope):
 	with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
 		lookup_table = tf.get_variable('lookup',
-								 dtype=tf.float32,
-								 shape=[input_dim, emb_dim],
-								 initializer=tf.random_normal_initializer())
+									   dtype=tf.float32,
+									   shape=[input_dim, emb_dim],
+									   initializer=tf.random_normal_initializer())
 		return lookup_table
 
 def GRU(inp, num_unit, scope):
