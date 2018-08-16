@@ -5,33 +5,44 @@ import numpy as np
 - This is a code of models and modules for "MIREX2018: Patterns of Prediction".
 '''
 # modules
-def look_up(input_dim, emb_dim, scope):
+def lookup(input_dim, emb_dim, scope):
 	with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
-		lookup_table = tf.get_variable('lookup',
-						dtype=tf.float32,
-						shape=[input_dim, emb_dim],
-						initializer=tf.random_normal_initializer())
+		lookup_table = tf.get_variable('lookup_table',
+									   dtype=tf.float32,
+									   shape=[input_dim, emb_dim],
+									   initializer=tf.contrib.layers.xavier_initializer())
 		return lookup_table
 
 def GRU(inp, num_unit, scope):
 	with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
 		gru_cell = tf.nn.rnn_cell.GRUCell(num_units=num_unit,
-						  kernel_initializer=tf.random_normal_initializer())
+										  kernel_initializer=tf.contrib.layers.xavier_initializer())
 		enc_length = length(inp)
 		gru_out, gru_states = tf.nn.dynamic_rnn(gru_cell, inp,
-							sequence_length=enc_length,
-							dtype=tf.float32)
+												sequence_length=enc_length,
+												dtype=tf.float32)
 		return gru_out, gru_states
 
 def biGRU(inp, num_unit, scope):
 	with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
 		gru_cell = tf.nn.rnn_cell.GRUCell(num_units=num_unit,
-						  kernel_initializer=tf.random_normal_initializer())
+										  kernel_initializer=tf.contrib.layers.xavier_initializer())
 		enc_length = length(inp)
 		gru_out, gru_states = tf.nn.bidirectional_dynamic_rnn(gru_cell, gru_cell, inp,
-								      sequence_length=enc_length,
-								      dtype=tf.float32)
+													  		  sequence_length=enc_length,
+															  dtype=tf.float32)
 		return gru_out, gru_states
+
+def LSTM(inp, num_unit, activation, scope):
+	with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
+		lstm_cell = tf.nn.rnn_cell.LSTMCell(num_units=num_unit,
+											activation=activation,
+										  	initializer=tf.contrib.layers.xavier_initializer())
+		enc_length = length(inp)
+		lstm_out, lstm_states = tf.nn.dynamic_rnn(lstm_cell, inp,
+												sequence_length=enc_length,
+												dtype=tf.float32)
+		return lstm_out, lstm_states
 
 def conv1d(inp, filters, kernel_size, dilation_rate, padding, scope):
 	with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
@@ -48,8 +59,16 @@ def conv1d(inp, filters, kernel_size, dilation_rate, padding, scope):
 									kernel_size=kernel_size,
 									strides=1,
 									dilation_rate=dilation_rate,
-									kernel_initializer=tf.random_normal_initializer())
+									kernel_initializer=tf.contrib.layers.xavier_initializer())
 		return conv_out
+def dense(inp, num_units, activation, scope):
+	with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
+		dense_out = tf.layers.dense(inp,
+    								units=num_units,
+    								activation=activation,
+    								use_bias=True,
+    								kernel_initializer=tf.contrib.layers.xavier_initializer())
+		return dense_out
 
 def length(seq): # for calculating sample lengths in one mini-batch
 	# if each sample contain value other than 0, returns 1
@@ -78,24 +97,50 @@ Models candidates:
 	- Deep artificial composer: a creative neural network model for automated melody generation(Colombo et al., 2017)
 - 3. LookbackRNN-like model
 	- https://magenta.tensorflow.org/2016/07/15/lookback-rnn-attention-rnn
+- 4. Wavenet-like model
 '''
 
 # DAC-like model(1)
 # for duration
-def dur_model(dur, inp_dim, num_unit, phase, scope):
-	with tf.variable_scope("dur_model", reuse=tf.AUTO_REUSE):
-		gru_out0 = GRU(dur, num_unit, scope="gru_0")
-		gru_out1 = GRU(gru_out0, dur_dim, scope="gru_1")
-		final_out = tf.nn.softmax(gru_out1, name='softmax')
-	return final_out
+def dur_model(dur, cond, timestep, inp_dim, oup_dim, emb_dim, num_unit, scope):
+	with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
+		# lookup_table0 = lookup(inp_dim, emb_dim, scope="lookup_0")
+		# emb_out0 = tf.nn.embedding_lookup(lookup_table0, dur, name="emb_0")
+		# emb_out0 = tf.einsum('bnk,kd->bnd', dur, lookup_table0, name="emb_0")
+		# conv_out0 = conv1d(emb_out0, num_unit, kernel_size=1, dilation_rate=1, padding="valid", scope="conv_0")
+		# conv_out1 = conv1d(conv_out0, num_unit, kernel_size=3, dilation_rate=3, padding="causal", scope="conv_1")
+		# conv_out2 = conv1d(conv_out1, num_unit, kernel_size=3, dilation_rate=9, padding="causal", scope="conv_2")
+		# conv_out3 = conv1d(conv_out2, num_unit, kernel_size=3, dilation_rate=27, padding="causal", scope="conv_3")
+		# relu_out0 = tf.nn.relu(conv_out3, name="relu_0")
+		# res_out0 = conv_out0 + relu_out0
+		# conv_out4 = conv1d(res_out0, oup_dim, kernel_size=1, dilation_rate=1, padding="valid", scope="conv_4")
+		gru_out0, _ = LSTM(dur, num_unit, activation=tf.nn.relu, scope="gru_0")
+		# # R0, A0 = attention(gru_out0, gru_out0, gru_out0, num_unit, softmax=True, scope="self_att0")
+		# # add_out0 = tf.contrib.layers.layer_norm(R0 + gru_out0, scope="ly_norm0") 
+		gru_out1, _ = LSTM(gru_out0, num_unit, activation=tf.nn.relu, scope="gru_1")
+		# # R1, A1 = attention(gru_out1, gru_out1, gru_out1, num_unit, softmax=True, scope="self_att1")
+		# # add_out1 = tf.contrib.layers.layer_norm(R1 + gru_out1, scope="ly_norm1") 
+		gru_out2, _ = LSTM(gru_out1, num_unit, activation=tf.nn.relu, scope="gru_2")
+		# # R1, A1 = attention(gru_out1, gru_out1, gru_out1, num_unit, softmax=True, scope="self_att1")
+		# # add_out1 = tf.layers.layer_norm(R1 + gru_out1, scope="ly_norm1")
+		gru_out3, _ = LSTM(gru_out2, oup_dim, activation=tf.nn.softmax, scope="gru_3")
+		# full_out = tf.contrib.layers.fully_connected(gru_state3, num_outputs=oup_dim, activation_fn=tf.nn.softmax)
+		# dense_out0 = dense(tf.reshape(gru_out2, (-1,timestep*num_unit)), oup_dim, activation=tf.nn.relu, scope="dense_out0")
+		# dense_out1 = dense(dense_out0, oup_dim, activation=tf.nn.sigmoid, scope="dense_out1")
+		final_out = tf.identity(gru_out3, name="final_out")
+	return final_out, gru_out0, gru_out1, gru_out3
 
 # for pitch
-def mnn_model(mnn, inp_dim, num_unit, phase, scope):
-	with tf.variable_scope("mnn_model", reuse=tf.AUTO_REUSE):
-		gru_out0 = GRU(mnn, num_unit, scope="gru_0")
-		gru_out1 = GRU(gru_out2, mnn_dim, scope="gru_1")
-		final_out = tf.nn.softmax(gru_out1, name='softmax')
-	return final_out
+# def mnn_model(mnn, inp_dim, oup_dim, emb_dim, num_unit, scope):
+# 	with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
+# 		# lookup_table0 = lookup(inp_dim, emb_dim, scope="lookup_0")
+# 		# emb_out0 = tf.einsum('bnk,kd->bnd', mnn, lookup_table0, name="emb_0")
+# 		gru_out0, _ = GRU(mnn, num_unit, scope="gru_0")
+# 		gru_out1, _ = GRU(gru_out0, num_unit, scope="gru_1")
+# 		gru_out2, _ = GRU(gru_out1, num_unit, scope="gru_2")
+# 		gru_out3, _ = GRU(gru_out2, oup_dim, scope="gru_3")
+# 		final_out = tf.nn.softmax(gru_out3, name='softmax')
+# 	return final_out
 
 # DAC-like model(2)
 
