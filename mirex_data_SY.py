@@ -516,6 +516,25 @@ class ParseTfrecords(object):
 
 
 if __name__ == "__main__":
-	parse_data = ParseData(data_dir=str(sys.argv[1]), 
-		data_size="small", data_mode=str(sys.argv[2]), batch_mode=None)
+	if len(sys.argv) == 1:
+		raise SyntaxError("Type your data directory!")
+	elif len(sys.argv) == 2:
+		raise SyntaxError("Type data mode (ex. note or frame)")
+	elif len(sys.argv) == 3:
+		data_dir = str(sys.argv[1])
+		data_mode = str(sys.argv[2])
+		if sys.argv[2] == "note":
+			batch_mode = None
+		elif sys.argv[2] == "frame":
+			raise SyntaxError("Type batch mode (ex. encdec or reg)")
+		else: 
+			raise SyntaxError("Type batch mode (ex. encdec or reg)")
+	elif len(sys.argv) == 4:
+		data_dir = str(sys.argv[1])
+		data_mode = str(sys.argv[2])
+		batch_mode = str(sys.argv[3])
+	parse_data = ParseData(data_dir=data_dir, 
+						   data_size="small", 
+						   data_mode=data_mode, 
+						   batch_mode=batch_mode)
 	parse_data(only_batch=False)
