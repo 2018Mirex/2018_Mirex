@@ -38,15 +38,17 @@ class ParseData(object):
 			- resulted batches are (input, output)
 	'''
 	def __init__(self, 
+				 data_dir=None,
 				 data_size=None, 
 				 data_mode=None, 
 				 batch_mode=None):
+		self.data_dir = data_dir
 		self.data_size = data_size 
 		self.data_mode = data_mode
 		self.batch_mode = batch_mode
 		self.data_type = "prime"
-		self.datapath = '/home/rsy/Documents/MIREX/dataset/' + \
-			'PPDD_mono_%s/%s' % (data_size, self.data_type)
+		self.datapath = os.path.join(self.data_dir, 
+			'PPDD_parsed_mono_%s/%s' % (data_size, self.data_type))
 		self.unit = [0.0, 0.08, 0.17, 0.25, 0.33, 0.42,
 					 0.5, 0.58, 0.67, 0.75, 0.83, 0.92]
 		self.dur_dim = 96
@@ -68,10 +70,10 @@ class ParseData(object):
 			elif only_batch == True:
 				self.save_frames()
 
-	def parse_raw(self):
-		rawpath = '/home/rsy/Documents/MIREX/dataset/PPDD_original/' + \
+	def parse_raw(self, path=None):
+		rawpath = os.path.join(self.data_dir,
 			'PPDD-Jul2018_sym_mono_%s/PPDD-Jul2018_sym_mono_%s/%s_csv' % \
-			(self.data_size, self.data_size, self.data_type)
+			(self.data_size, self.data_size, self.data_type))
 		savepath = os.path.join(self.datapath, "raw")
 		# if path does not exist, create one
 		if not os.path.exists(savepath): 
@@ -289,7 +291,7 @@ class ParseData(object):
 	def make_batches_note(self, data1, data2):
 		datalen = len(data1)
 		maxlen = 20
-		stride = 4
+		stride = 1
 		data1_inp_batch = list()
 		data1_oup_batch = list()
 		data2_inp_batch = list()
@@ -329,7 +331,7 @@ class ParseData(object):
 
 	def make_batches_frame(self, data):
 		datalen = len(data)
-		maxlen = 48 # 2 measures
+		maxlen = 48 # 1 measures
 		dim = 89
 		stride = 1
 		if self.batch_mode == "encdec":
@@ -514,5 +516,6 @@ class ParseTfrecords(object):
 
 
 if __name__ == "__main__":
-	parse_data = ParseData(data_size="small", data_mode="frame", batch_mode="encdec")
+	parse_data = ParseData(data_dir=str(sys.argv[1]), 
+		data_size="small", data_mode=str(sys.argv[2]), batch_mode=None)
 	parse_data(only_batch=False)
