@@ -144,6 +144,11 @@ class ParseData(object):
 				unit_long.append(s+i)
 		for ui, u in enumerate(unit_long):
 			unit2ind_long[u] = ui
+		dur_hist = dict()
+		mnn_hist = dict()
+		for s in ['train', 'val', 'test']:
+			dur_hist[s] = dict()
+			mnn_hist[s] = dict()
 		filelist = sorted(glob(os.path.join(self.datapath, 'raw/*_raw.npy')))
 		# split data into one of train, val, test sets
 		datalen = len(filelist)
@@ -174,6 +179,28 @@ class ParseData(object):
 				# parse midi number into range 0-87
 				mnn_ind = int(mnn) - 21
 				mnn_onehot[ni][mnn_ind] = 1
+				# for histogram
+				if fi in train_ind:
+					try:
+						dur_hist['train'][dur_ind] += 1
+						mnn_hist['train'][mnn_ind] += 1
+					except KeyError:
+						dur_hist['train'][dur_ind] = 1
+						mnn_hist['train'][mnn_ind] = 1
+				elif fi in val_ind:
+					try:
+						dur_hist['val'][dur_ind] += 1
+						mnn_hist['val'][mnn_ind] += 1
+					except KeyError:
+						dur_hist['val'][dur_ind] = 1
+						mnn_hist['val'][mnn_ind] = 1
+				elif fi in test_ind:
+					try:
+						dur_hist['test'][dur_ind] += 1
+						mnn_hist['test'][mnn_ind] += 1
+					except KeyError:
+						dur_hist['test'][dur_ind] = 1
+						mnn_hist['test'][mnn_ind] = 1
 			# make input and output files and save them
 			dur_inp_batch, dur_oup_batch, \
 			mnn_inp_batch, mnn_oup_batch = self.make_batches_note(dur_onehot, mnn_onehot)
@@ -189,10 +216,14 @@ class ParseData(object):
 			elif fi in test_ind:		
 				np.save(os.path.join(test_path,'%s_d_test_inp.npy' % fileind), dur_inp_batch)
 				np.save(os.path.join(test_path,'%s_d_test_oup.npy' % fileind), dur_oup_batch)
+				np.save(os.path.join(test_path,'%s_d_test_all.npy' % fileind), dur_onehot)
 				np.save(os.path.join(test_path,'%s_m_test_inp.npy' % fileind), mnn_inp_batch)
 				np.save(os.path.join(test_path,'%s_m_test_oup.npy' % fileind), mnn_oup_batch)
+				np.save(os.path.join(test_path,'%s_m_test_all.npy' % fileind), mnn_onehot)
 			print('saved %ith tfrecord sets & test set' % (fi+1), end='\r')
 		print()
+		np.save(os.path.join(savepath,'dur_hist_note.npy'), dur_hist)
+		np.save(os.path.join(savepath,'mnn_hist_note.npy'), mnn_hist)
 		print("---DONE---")
 
 	def save_frames(self):
@@ -207,6 +238,9 @@ class ParseData(object):
 		unit2ind_short = dict()	
 		for ui, u in enumerate(self.unit):
 			unit2ind_short[u] = ui
+		mnn_hist = dict()
+		for s in ['train', 'val', 'test']:
+			mnn_hist[s] = dict()
 		frame = 12
 		filelist = sorted(glob(os.path.join(self.datapath, 'raw/*_raw.npy')))
 		datalen = len(filelist)
@@ -254,6 +288,22 @@ class ParseData(object):
 				# parse midi number into range 0-87
 				mnn_fr = int(mnn) - 21
 				piano_roll[pos_:pos_+dur_fr] = mnn_fr
+				# for histogram
+				if fi in train_ind:
+					try:
+						mnn_hist['train'][mnn_fr] += 1
+					except KeyError:
+						mnn_hist['train'][mnn_fr] = 1
+				elif fi in val_ind:
+					try:
+						mnn_hist['val'][mnn_fr] += 1
+					except KeyError:
+						mnn_hist['val'][mnn_fr] = 1
+				elif fi in test_ind:
+					try:
+						mnn_hist['test'][mnn_fr] += 1
+					except KeyError:
+						mnn_hist['test'][mnn_fr] = 1
 			piano_roll = piano_roll[first_pos:]
 			# make input and output files and save them
 			# for enc-dec structure
@@ -270,6 +320,7 @@ class ParseData(object):
 					np.save(os.path.join(test_path,'%s_test_inp1.npy' % fileind), inp1_batch)
 					np.save(os.path.join(test_path,'%s_test_inp2.npy' % fileind), inp2_batch)
 					np.save(os.path.join(test_path,'%s_test_oup.npy' % fileind), oup_batch)
+					np.save(os.path.join(test_path,'%s_test_all.npy' % fileind), piano_roll)
 			# for autoregressive structure
 			elif self.batch_mode == "reg": 
 				inp_batch, oup_batch = self.make_batches_frame(piano_roll)
@@ -283,9 +334,11 @@ class ParseData(object):
 				elif fi in test_ind:
 					np.save(os.path.join(test_path,'%s_test_inp.npy' % fileind), inp_batch)
 					np.save(os.path.join(test_path,'%s_test_oup.npy' % fileind), oup_batch)
+					np.save(os.path.join(test_path,'%s_test_all.npy' % fileind), piano_roll)
 			print('saved %ith tfrecord sets & test set (mode: %s)' \
 				% (fi+1, self.batch_mode), end='\r')
 		print()
+		np.save(os.path.join(savepath,'mnn_hist_frame.npy'), mnn_hist)
 		print("---DONE---")
 
 	def make_batches_note(self, data1, data2):
