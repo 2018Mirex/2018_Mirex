@@ -53,6 +53,9 @@ class ParseData(object):
 					 0.5, 0.58, 0.67, 0.75, 0.83, 0.92]
 		self.dur_dim = 96
 		self.mnn_dim = 88
+		self.inp_dim = 89
+		self.timestep_frame = 96
+		self.timestep_note = 20
 
 	def __call__(self, only_batch=False):
 		if self.data_mode == "note":
@@ -288,53 +291,55 @@ class ParseData(object):
 				# parse midi number into range 0-87
 				mnn_fr = int(mnn) - 21
 				piano_roll[pos_:pos_+dur_fr] = mnn_fr
-				# for histogram
+
+			piano_roll = piano_roll[first_pos:]
+			# for histogram
+			for m in piano_roll:
 				if fi in train_ind:
 					try:
-						mnn_hist['train'][mnn_fr] += 1
+						mnn_hist['train'][m] += 1
 					except KeyError:
-						mnn_hist['train'][mnn_fr] = 1
+						mnn_hist['train'][m] = 1
 				elif fi in val_ind:
 					try:
-						mnn_hist['val'][mnn_fr] += 1
+						mnn_hist['val'][m] += 1
 					except KeyError:
-						mnn_hist['val'][mnn_fr] = 1
+						mnn_hist['val'][m] = 1
 				elif fi in test_ind:
 					try:
-						mnn_hist['test'][mnn_fr] += 1
+						mnn_hist['test'][m] += 1
 					except KeyError:
-						mnn_hist['test'][mnn_fr] = 1
-			piano_roll = piano_roll[first_pos:]
+						mnn_hist['test'][m] = 1
 			# make input and output files and save them
 			# for enc-dec structure
-			if self.batch_mode == "encdec": 
-				inp1_batch, inp2_batch, oup_batch = self.make_batches_frame(piano_roll)
-				# save batches into tfrecord files 
-				if fi in train_ind:
-					self.save_tfrecords_frame([inp1_batch, inp2_batch, oup_batch], 
-											  tf_savepath, fileind, 'train')
-				elif fi in val_ind:
-					self.save_tfrecords_frame([inp1_batch, inp2_batch, oup_batch], 
-											  tf_savepath, fileind, 'val')
-				elif fi in test_ind:
-					np.save(os.path.join(test_path,'%s_test_inp1.npy' % fileind), inp1_batch)
-					np.save(os.path.join(test_path,'%s_test_inp2.npy' % fileind), inp2_batch)
-					np.save(os.path.join(test_path,'%s_test_oup.npy' % fileind), oup_batch)
-					np.save(os.path.join(test_path,'%s_test_all.npy' % fileind), piano_roll)
-			# for autoregressive structure
-			elif self.batch_mode == "reg": 
-				inp_batch, oup_batch = self.make_batches_frame(piano_roll)
-				# save batches into tfrecord files 
-				if fi in train_ind:
-					self.save_tfrecords_frame([inp_batch, oup_batch], 
-											  tf_savepath, fileind, 'train')
-				elif fi in val_ind:
-					self.save_tfrecords_frame([inp_batch, oup_batch], 
-											  tf_savepath, fileind, 'val')
-				elif fi in test_ind:
-					np.save(os.path.join(test_path,'%s_test_inp.npy' % fileind), inp_batch)
-					np.save(os.path.join(test_path,'%s_test_oup.npy' % fileind), oup_batch)
-					np.save(os.path.join(test_path,'%s_test_all.npy' % fileind), piano_roll)
+			# if self.batch_mode == "encdec": 
+			# 	inp1_batch, inp2_batch, oup_batch = self.make_batches_frame(piano_roll)
+			# 	# save batches into tfrecord files 
+			# 	if fi in train_ind:
+			# 		self.save_tfrecords_frame([inp1_batch, inp2_batch, oup_batch], 
+			# 								  tf_savepath, fileind, 'train')
+			# 	elif fi in val_ind:
+			# 		self.save_tfrecords_frame([inp1_batch, inp2_batch, oup_batch], 
+			# 								  tf_savepath, fileind, 'val')
+			# 	elif fi in test_ind:
+			# 		np.save(os.path.join(test_path,'%s_test_inp1.npy' % fileind), inp1_batch)
+			# 		np.save(os.path.join(test_path,'%s_test_inp2.npy' % fileind), inp2_batch)
+			# 		np.save(os.path.join(test_path,'%s_test_oup.npy' % fileind), oup_batch)
+			# 		np.save(os.path.join(test_path,'%s_test_all.npy' % fileind), piano_roll)
+			# # for autoregressive structure
+			# elif self.batch_mode == "reg": 
+			# 	inp_batch, oup_batch = self.make_batches_frame(piano_roll)
+			# 	# save batches into tfrecord files 
+			# 	if fi in train_ind:
+			# 		self.save_tfrecords_frame([inp_batch, oup_batch], 
+			# 								  tf_savepath, fileind, 'train')
+			# 	elif fi in val_ind:
+			# 		self.save_tfrecords_frame([inp_batch, oup_batch], 
+			# 								  tf_savepath, fileind, 'val')
+			# 	elif fi in test_ind:
+			# 		np.save(os.path.join(test_path,'%s_test_inp.npy' % fileind), inp_batch)
+			# 		np.save(os.path.join(test_path,'%s_test_oup.npy' % fileind), oup_batch)
+			# 		np.save(os.path.join(test_path,'%s_test_all.npy' % fileind), piano_roll)
 			print('saved %ith tfrecord sets & test set (mode: %s)' \
 				% (fi+1, self.batch_mode), end='\r')
 		print()
@@ -343,7 +348,7 @@ class ParseData(object):
 
 	def make_batches_note(self, data1, data2):
 		datalen = len(data1)
-		maxlen = 20
+		maxlen = self.timestep_note
 		stride = 1
 		data1_inp_batch = list()
 		data1_oup_batch = list()
@@ -384,8 +389,8 @@ class ParseData(object):
 
 	def make_batches_frame(self, data):
 		datalen = len(data)
-		maxlen = 48 # 1 measures
-		dim = 89
+		maxlen = self.timestep_frame # 1 measures
+		dim = self.inp_dim
 		stride = 1
 		if self.batch_mode == "encdec":
 			inp1_batch, inp2_batch, oup_batch = list(), list(), list()
@@ -453,6 +458,11 @@ class ParseTfrecords(object):
         self.num_epoch = num_epoch
         self.batch_size1 = batch_size1
         self.batch_size2 = batch_size2
+        self.timestep_note = 20
+        self.timestep_frame = 96
+        self.dur_dim = 96
+        self.mnn_dim = 88
+        self.inp_dim = 89
 
     def __call__(self):
         if self.data_mode == "frame":
@@ -468,8 +478,8 @@ class ParseTfrecords(object):
         return train_data, val_data
 
     def parse_tfrecord_note(self, path, shuffle, setname):
-        timesteps = 20
-        dur_dim, mnn_dim = 96, 88
+        timesteps = self.timestep_note
+        dur_dim, mnn_dim = self.dur_dim, self.mnn_dim
         if setname not in ['train', 'val']:
             raise ValueError
         # filenames are shuffled(default) every epoch:
@@ -508,7 +518,8 @@ class ParseTfrecords(object):
         return [di, do, mi, mo]
 
     def parse_tfrecord_frame(self, path, shuffle, setname):
-        timesteps, dim = 48, 89
+        timesteps = self.timestep_frame
+        dim = self.inp_dim
         if setname not in ['train', 'val']:
             raise ValueError
         # filenames are shuffled(default) every epoch:
@@ -553,14 +564,14 @@ class ParseTfrecords(object):
             inp = tf.reshape(inp, (timesteps,))
             oup = tf.reshape(oup, (timesteps,))
             if setname == 'train':
-                i, o = tf.train.shuffle_batch([inp, cond, oup],
+                i, o = tf.train.shuffle_batch([inp, oup],
                                               batch_size=self.batch_size1,
                                               capacity=1000+3*self.batch_size1,
                                               num_threads=4,
                                               min_after_dequeue=1000,
                                               allow_smaller_final_batch=True)
             elif setname == 'val':
-                i, o = tf.train.batch([inp, cond, oup],
+                i, o = tf.train.batch([inp, oup],
                                       batch_size=self.batch_size2,
                                       capacity=1000+3*self.batch_size2,
                                       allow_smaller_final_batch=True,
